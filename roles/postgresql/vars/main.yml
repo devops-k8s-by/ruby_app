@@ -1,4 +1,5 @@
 ---
-postgresql_db_name: app_db
-postgresql_db_user: app_user
-postgresql_db_password: app_password
+db_name: app_db
+db_user: app_user
+db_password: app_password
+ansible_python_interpreter: /usr/bin/python3

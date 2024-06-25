@@ -77,19 +77,17 @@
     lc_collate: 'en_US.UTF-8'
     lc_ctype: 'en_US.UTF-8'
     template: template0
-  vars:
-    ansible_python_interpreter: /usr/bin/python3
   tags:
     - database
 
 - name: Create application user
+  community.postgresql.postgresql_user:
+    name: "{{ db_user }}"
+    password: "{{ db_password }}"
+    priv: "ALL"
+    db: "{{ db_name }}"
+    state: present
   become: true
   become_user: postgres
-  community.postgresql.postgresql_user:
-    name: "{{ app_db_user }}"
-    password: "{{ app_db_password }}"
-    db: "{{ app_db_name }}"
-    priv: "{{ app_db_name }}:ALL"
-    role_attr_flags: CREATEDB
-  vars:
-    ansible_python_interpreter: /usr/bin/python3
+  tags:
+    - user

@@ -2,7 +2,10 @@
 - name: Deploy Ruby on Rails Application
   hosts: web
   become: true
+  vars_files:
+    - .env
   roles:
-    - role: postgresql
-    - role: nginx
+#    - role: postgresql
     - role: app
+    - role: nginx
+

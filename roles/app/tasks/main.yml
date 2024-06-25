@@ -1,44 +1,98 @@
----
 - name: Install dependencies
-  ansible.builtin.dnf:
+  ansible.builtin.yum:
     name: "{{ item }}"
     state: present
   loop:
-    - build-base
-    - libxml2-dev
+    - gcc
+    - openssl-devel
+    - libyaml-devel
+    - libffi-devel
+    - readline-devel
+    - zlib-devel
+    - gdbm-devel
+    - ncurses-devel
+    - gnupg2
 
-- name: Install Ruby
+- name: Import GPG keys for RVM
   ansible.builtin.command:
-    cmd: dnf install -y https://cache.ruby-lang.org/pub/ruby/2.6/ruby-2.6.10.tar.gz
-  changed_when: false
+    cmd: gpg --keyserver hkp://keyserver.ubuntu.com --recv-keys 409B6B1796C275462A1703113804BB82D39DC0E3 7D2BAF1CF37B13E2069D6956105BD0E739499BDB
+  register: gpg_keys
+
+- name: Import additional GPG key for mpapis
+  ansible.builtin.shell:
+    cmd: curl -sSL https://rvm.io/mpapis.asc | gpg2 --import -
+
+- name: Import additional GPG key for pkuczynski
+  ansible.builtin.shell:
+    cmd: curl -sSL https://rvm.io/pkuczynski.asc | gpg2 --import -
+
+- name: Install RVM
+  ansible.builtin.shell:
+    cmd: \curl -sSL https://get.rvm.io | bash -s stable
+  args:
+    creates: /usr/local/rvm/bin/rvm
+
+- name: Source RVM script
+  ansible.builtin.shell:
+    cmd: source /etc/profile.d/rvm.sh
+  args:
+    executable: /bin/bash
+
+- name: Install Ruby with RVM
+  ansible.builtin.shell:
+    cmd: rvm install 2.6.0
+  args:
+    creates: /usr/local/rvm/rubies/ruby-2.6.0
+  environment:
+    PATH: "/usr/local/rvm/bin:{{ ansible_env.PATH }}"
+  register: install_ruby
+
+- name: Set Ruby 2.6.0 as default
+  ansible.builtin.shell:
+    cmd: rvm use 2.6.0 --default
+  environment:
+    PATH: "/usr/local/rvm/bin:{{ ansible_env.PATH }}"
+  when: install_ruby.changed
 
 - name: Install bundler
-  community.general.gem:
-    name: bundler
-    version: 2.4.22
-    state: present
+  ansible.builtin.shell:
+    cmd: gem install bundler -v 2.4.22
+  environment:
+    PATH: "/usr/local/rvm/rubies/ruby-2.6.0/bin:{{ ansible_env.PATH }}"
+  args:
+    creates: /usr/local/rvm/rubies/ruby-2.6.0/bin/bundler
 
-- name: Deploy application code
-  ansible.builtin.copy:
-    src: /Users/nikolaizhukov/ansible-cource/practicum/ansible-practicum-nzhukov/
-    dest: /home/ecs-user/app
-    owner: ecs-user
-    group: ecs-user
-    mode: '0755'
+- name: Synchronize application code
+  ansible.builtin.synchronize:
+    src: /Users/nikolaizhukov/ansible-cource/practicum/ruby_app/app/
+    dest: /home/ecs-user/app/
+    recursive: yes
+    delete: no
+    rsync_opts:
+      - "--progress"
 
 - name: Configure bundler for nokogiri
-  ansible.builtin.command:
-    cmd: /usr/local/bin/bundle config build.nokogiri --use-system-libraries
+  ansible.builtin.shell:
+    cmd: /usr/local/rvm/rubies/ruby-2.6.0/bin/bundle config build.nokogiri --use-system-libraries
   args:
     chdir: /home/ecs-user/app
+  environment:
+    PATH: "/usr/local/rvm/rubies/ruby-2.6.0/bin:{{ ansible_env.PATH }}"
   changed_when: false
 
+- name: Check if Gemfile.lock exists
+  ansible.builtin.stat:
+    path: /home/ecs-user/app/Gemfile.lock
+  register: gemfile_lock
+
 - name: Install application dependencies
-  ansible.builtin.command:
-    cmd: /usr/local/bin/bundle install --clean --no-cache --without development
+  ansible.builtin.shell:
+    cmd: /usr/local/rvm/rubies/ruby-2.6.0/bin/bundle install --clean --no-cache --without development
   args:
     chdir: /home/ecs-user/app
-  changed_when: false
+  when: not gemfile_lock.stat.exists
+  environment:
+    PATH: "/usr/local/rvm/rubies/ruby-2.6.0/bin:{{ ansible_env.PATH }}"
 
 - name: Create systemd service file from template
   ansible.builtin.template:

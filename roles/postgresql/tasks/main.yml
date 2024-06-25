@@ -1,0 +1,95 @@
+---
+
+- name: Add PostgreSQL 14 repository
+  ansible.builtin.yum:
+    name: https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+    state: present
+
+- name: Install PostgreSQL 14 server and client
+  ansible.builtin.yum:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - postgresql14-server
+    - python3-devel
+    - postgresql-devel
+
+- name: Upgrade pip3 to the latest version
+  ansible.builtin.pip:
+    name: pip
+    executable: pip3
+    state: latest
+
+
+- name: Install psycopg2-binary using pip3
+  ansible.builtin.pip:
+    name: psycopg2-binary
+    executable: pip3
+    state: present
+
+
+- name: Check if PostgreSQL data directory exists
+  ansible.builtin.stat:
+    path: /var/lib/pgsql/14/data
+  register: pg_data_dir
+
+- name: Initialize PostgreSQL 14 database cluster
+  ansible.builtin.command:
+    cmd: /usr/pgsql-14/bin/postgresql-14-setup initdb
+  become: true
+  when: not pg_data_dir.stat.exists
+
+
+- name: Start and enable PostgreSQL 14 service
+  ansible.builtin.service:
+    name: postgresql-14
+    state: started
+    enabled: true
+
+
+- name: Configure PostgreSQL to allow password authentication
+  ansible.builtin.template:
+    src: pg_hba.conf.j2
+    dest: /var/lib/pgsql/14/data/pg_hba.conf
+    owner: postgres
+    group: postgres
+    mode: '0600'
+  notify:
+    - Restart PostgreSQL
+
+- name: Ensure PostgreSQL is listening on all interfaces
+  ansible.builtin.lineinfile:
+    path: /var/lib/pgsql/14/data/postgresql.conf
+    regexp: '^#?(listen_addresses\s*=\s*)\S+'
+    line: "listen_addresses = '*'"
+    state: present
+  notify:
+    - Restart PostgreSQL
+
+
+- name: Create application database
+  become: true
+  become_user: postgres
+  community.general.postgresql_db:
+    name: "{{ app_db_name }}"
+    owner: postgres
+    encoding: UTF8
+    lc_collate: 'en_US.UTF-8'
+    lc_ctype: 'en_US.UTF-8'
+    template: template0
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+  tags:
+    - database
+
+- name: Create application user
+  become: true
+  become_user: postgres
+  community.postgresql.postgresql_user:
+    name: "{{ app_db_user }}"
+    password: "{{ app_db_password }}"
+    db: "{{ app_db_name }}"
+    priv: "{{ app_db_name }}:ALL"
+    role_attr_flags: CREATEDB
+  vars:
+    ansible_python_interpreter: /usr/bin/python3

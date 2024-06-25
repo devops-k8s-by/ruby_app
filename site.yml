@@ -1,0 +1,8 @@
+---
+- name: Deploy Ruby on Rails Application
+  hosts: web
+  become: true
+  roles:
+    - role: postgresql
+    - role: nginx
+    - role: app

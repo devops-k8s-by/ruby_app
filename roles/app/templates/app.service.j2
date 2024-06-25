@@ -1,0 +1,22 @@
+[Unit]
+Description=My Ruby on Rails application
+After=network.target
+
+[Service]
+Type=simple
+User=ecs-user
+WorkingDirectory=/home/ecs-user/app
+Environment="SECRET_KEY_BASE={{ SECRET_KEY_BASE }}"
+Environment="RAILS_ENV={{ RAILS_ENV }}"
+Environment="RAILS_LOG_TO_STDOUT={{ RAILS_LOG_TO_STDOUT }}"
+Environment="DB_HOST={{ DB_HOST }}"
+Environment="DB_PORT={{ DB_PORT }}"
+Environment="DB_NAME={{ DB_NAME }}"
+Environment="DB_USER={{ DB_USER }}"
+Environment="DB_PASSWORD={{ DB_PASSWORD }}"
+ExecStart=/usr/local/bin/bundle exec rake db:migrate && /usr/local/bin/bundle exec puma -b unix:///var/run/puma.sock -e $RAILS_ENV config.ru
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+

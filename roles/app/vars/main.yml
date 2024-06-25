@@ -1,0 +1,9 @@
+---
+app_secret_key_base: lol_kek_cheburek
+app_rails_env: production
+app_rails_log_to_stdout: 1
+app_db_host: 127.0.0.1
+app_db_port: 5432
+app_db_name: app_db
+app_db_user: app_user
+app_db_password: app_password

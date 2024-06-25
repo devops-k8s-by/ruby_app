@@ -1,0 +1,53 @@
+---
+- name: Install dependencies
+  ansible.builtin.dnf:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - build-base
+    - libxml2-dev
+
+- name: Install Ruby
+  ansible.builtin.command:
+    cmd: dnf install -y https://cache.ruby-lang.org/pub/ruby/2.6/ruby-2.6.10.tar.gz
+  changed_when: false
+
+- name: Install bundler
+  community.general.gem:
+    name: bundler
+    version: 2.4.22
+    state: present
+
+- name: Deploy application code
+  ansible.builtin.copy:
+    src: /Users/nikolaizhukov/ansible-cource/practicum/ansible-practicum-nzhukov/
+    dest: /home/ecs-user/app
+    owner: ecs-user
+    group: ecs-user
+    mode: '0755'
+
+- name: Configure bundler for nokogiri
+  ansible.builtin.command:
+    cmd: /usr/local/bin/bundle config build.nokogiri --use-system-libraries
+  args:
+    chdir: /home/ecs-user/app
+  changed_when: false
+
+- name: Install application dependencies
+  ansible.builtin.command:
+    cmd: /usr/local/bin/bundle install --clean --no-cache --without development
+  args:
+    chdir: /home/ecs-user/app
+  changed_when: false
+
+- name: Create systemd service file from template
+  ansible.builtin.template:
+    src: app.service.j2
+    dest: /etc/systemd/system/app.service
+    mode: '0644'
+
+- name: Ensure application service is enabled and started
+  ansible.builtin.systemd:
+    name: app
+    state: started
+    enabled: true

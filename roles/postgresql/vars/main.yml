@@ -1,0 +1,4 @@
+---
+postgresql_db_name: app_db
+postgresql_db_user: app_user
+postgresql_db_password: app_password
